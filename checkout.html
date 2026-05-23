@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brandly — Get Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<!-- Load Stripe.js -->
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #0f0e0c; --ink-2: #3a3830; --ink-3: #7a776e; --ink-4: #b8b4aa;
+  --paper: #faf8f4; --paper-2: #f2efe8; --paper-3: #e8e4d8;
+  --accent: #c8873a; --accent-l: #f5e8d6; --accent-d: #9a5f1e;
+  --green: #2d6a4f; --green-l: #d8f0e4;
+  --border: rgba(15,14,12,0.1); --border-2: rgba(15,14,12,0.18);
+  --r: 12px; --r-lg: 20px;
+}
+body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+nav {
+  border-bottom: 1px solid var(--border); padding: 0 2rem; height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { font-family: 'DM Serif Display', serif; font-size: 22px; }
+.logo em { color: var(--accent); font-style: normal; }
+
+.checkout-wrap {
+  max-width: 960px; margin: 0 auto; padding: 4rem 2rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: start;
+}
+
+/* LEFT — Plan summary */
+.plan-summary h1 { font-family: 'DM Serif Display', serif; font-size: 36px; letter-spacing: -1px; margin-bottom: 8px; }
+.plan-summary p { font-size: 15px; color: var(--ink-3); margin-bottom: 2rem; }
+
+.selected-plan {
+  background: var(--ink); color: var(--paper);
+  border-radius: var(--r-lg); padding: 1.75rem; margin-bottom: 1.5rem;
+}
+.selected-plan .plan-name { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 4px; }
+.selected-plan .plan-price { font-family: 'DM Serif Display', serif; font-size: 48px; letter-spacing: -1px; line-height: 1; margin-bottom: 4px; }
+.selected-plan .plan-price sup { font-size: 24px; vertical-align: top; margin-top: 10px; }
+.selected-plan .plan-cycle { font-size: 13px; color: rgba(250,248,244,0.4); margin-bottom: 1.5rem; }
+
+.feature-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.feature-list li { font-size: 14px; color: rgba(250,248,244,0.75); display: flex; align-items: center; gap: 10px; }
+.feature-list li::before { content: '✓'; color: var(--accent); font-weight: 700; }
+
+.plan-toggle { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+.plan-toggle-btn {
+  flex: 1; padding: 10px; border: 1px solid var(--border-2); border-radius: var(--r);
+  background: #fff; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  color: var(--ink-2); cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.plan-toggle-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.guarantee {
+  background: var(--green-l); border: 1px solid rgba(45,106,79,0.2);
+  border-radius: var(--r); padding: 1rem 1.25rem;
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.guarantee-icon { font-size: 20px; }
+.guarantee-text { font-size: 13px; color: var(--green); line-height: 1.5; }
+.guarantee-text strong { font-weight: 600; display: block; margin-bottom: 2px; }
+
+/* RIGHT — Checkout form */
+.checkout-form-wrap {
+  background: #fff; border: 1px solid var(--border-2);
+  border-radius: var(--r-lg); padding: 2rem;
+}
+.checkout-form-wrap h2 { font-size: 18px; font-weight: 600; color: var(--ink); margin-bottom: 1.5rem; }
+
+.field-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 1rem; }
+.field-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+
+input[type="email"], input[type="text"], input[type="password"] {
+  width: 100%; padding: 12px 14px; border: 1px solid var(--border-2); border-radius: var(--r);
+  font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--ink);
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s; background: var(--paper);
+}
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-l); background: #fff; }
+
+/* Stripe card element container */
+.stripe-card-wrap {
+  border: 1px solid var(--border-2); border-radius: var(--r);
+  padding: 12px 14px; background: var(--paper);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.stripe-card-wrap.focused { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-l); background: #fff; }
+
+.divider-text { text-align: center; position: relative; margin: 1.25rem 0; }
+.divider-text::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--border); }
+.divider-text span { position: relative; background: #fff; padding: 0 12px; font-size: 12px; color: var(--ink-4); }
+
+.secure-badges { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 1.25rem; }
+.badge { font-size: 11px; color: var(--ink-4); display: flex; align-items: center; gap: 4px; }
+
+.submit-btn {
+  width: 100%; padding: 15px; background: var(--ink); color: var(--paper);
+  border: none; border-radius: var(--r); font-family: 'DM Serif Display', serif;
+  font-size: 18px; cursor: pointer; transition: all 0.2s; display: flex;
+  align-items: center; justify-content: center; gap: 8px;
+}
+.submit-btn:hover:not(:disabled) { background: var(--accent); transform: translateY(-1px); }
+.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.submit-btn .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.terms-note { font-size: 11px; color: var(--ink-4); text-align: center; margin-top: 1rem; line-height: 1.5; }
+.terms-note a { color: var(--ink-3); }
+
+.success-state { text-align: center; padding: 2rem; display: none; }
+.success-icon { font-size: 48px; margin-bottom: 1rem; }
+.success-state h3 { font-family: 'DM Serif Display', serif; font-size: 24px; color: var(--ink); margin-bottom: 8px; }
+.success-state p { font-size: 14px; color: var(--ink-3); margin-bottom: 1.5rem; }
+.success-btn { display: inline-block; background: var(--ink); color: var(--paper); padding: 12px 24px; border-radius: var(--r); font-size: 14px; font-weight: 600; text-decoration: none; }
+
+.error-msg { background: #fef2f2; border: 1px solid #fca5a5; border-radius: var(--r); padding: 10px 14px; font-size: 13px; color: #dc2626; margin-bottom: 1rem; display: none; }
+
+.auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+.auth-tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--ink-3); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none; }
+.auth-tab.active { color: var(--accent-d); border-bottom-color: var(--accent); }
+
+@media (max-width: 768px) {
+  .checkout-wrap { grid-template-columns: 1fr; gap: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Brand<em>ly</em></div>
+  <a href="index.html" style="font-size:13px;color:var(--ink-3);text-decoration:none">← Back</a>
+</nav>
+
+<div class="checkout-wrap">
+
+  <!-- LEFT: Plan summary -->
+  <div class="plan-summary">
+    <h1>Upgrade to Pro</h1>
+    <p>Unlimited brand kits. Professional exports. No limits.</p>
+
+    <div class="plan-toggle" id="planToggle">
+      <button class="plan-toggle-btn active" onclick="selectPlan('pro', 19, 'monthly', this)">Pro — $19/mo</button>
+      <button class="plan-toggle-btn" onclick="selectPlan('pro_annual', 12, 'annual', this)">Pro — $12/mo <span style="font-size:11px;color:#2d6a4f;font-weight:700">Save 37%</span></button>
+    </div>
+
+    <div class="selected-plan" id="selectedPlanBox">
+      <div class="plan-name">Pro Plan</div>
+      <div class="plan-price"><sup>$</sup><span id="priceDisplay">19</span></div>
+      <div class="plan-cycle" id="cycleDisplay">per month, billed monthly</div>
+      <ul class="feature-list">
+        <li>Unlimited brand kit generations</li>
+        <li>Save unlimited brand kits</li>
+        <li>PDF export</li>
+        <li>Priority AI generation</li>
+        <li>No Brandly watermark on exports</li>
+        <li>Cancel anytime</li>
+      </ul>
+    </div>
+
+    <div class="guarantee">
+      <div class="guarantee-icon">🛡</div>
+      <div class="guarantee-text">
+        <strong>7-day money-back guarantee</strong>
+        Not happy? Email us within 7 days for a full refund, no questions asked.
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Checkout form -->
+  <div class="checkout-form-wrap">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchAuth('new')">New account</button>
+      <button class="auth-tab" onclick="switchAuth('login')">Sign in</button>
+    </div>
+
+    <div id="formContent">
+      <!-- Error message -->
+      <div class="error-msg" id="errorMsg"></div>
+
+      <!-- Email -->
+      <div class="field-group" id="nameField">
+        <label class="field-label">Full name</label>
+        <input type="text" id="fullName" placeholder="Your name" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Email address</label>
+        <input type="email" id="email" placeholder="you@example.com" />
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input type="password" id="password" placeholder="Create a password" />
+      </div>
+
+      <div class="divider-text"><span>Payment details</span></div>
+
+      <div class="secure-badges">
+        <span class="badge">🔒 SSL Encrypted</span>
+        <span class="badge">💳 Powered by Stripe</span>
+        <span class="badge">✓ PCI Compliant</span>
+      </div>
+
+      <!-- Stripe Card Element -->
+      <div class="field-group">
+        <label class="field-label">Card details</label>
+        <div class="stripe-card-wrap" id="cardWrap">
+          <div id="card-element"><!-- Stripe mounts here --></div>
+        </div>
+        <div id="card-errors" style="font-size:12px;color:#dc2626;margin-top:4px"></div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">
+        <span id="submitText">Start Pro — $19/mo</span>
+      </button>
+
+      <p class="terms-note">
+        By subscribing you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        Your card will be charged $19/month. Cancel anytime.
+      </p>
+    </div>
+
+    <!-- Success state -->
+    <div class="success-state" id="successState">
+      <div class="success-icon">🎉</div>
+      <h3>Welcome to Brandly Pro!</h3>
+      <p>Your account is ready. Start generating unlimited brand kits right now.</p>
+      <a href="app.html" class="success-btn">Open Brandly →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STRIPE INTEGRATION
+// ============================================================
+// SETUP INSTRUCTIONS:
+// 1. Create a Stripe account at stripe.com
+// 2. Get your Publishable Key from Stripe Dashboard > Developers > API Keys
+// 3. Replace 'pk_test_YOUR_KEY_HERE' below with your actual key
+// 4. Create Price IDs in Stripe Dashboard > Products > Add product
+// 5. Replace the priceIds below with your actual Price IDs
+// 6. Deploy a backend endpoint (Netlify Function / Vercel Serverless)
+//    to handle subscription creation securely
+// ============================================================
+
+const STRIPE_PK = 'pk_test_YOUR_PUBLISHABLE_KEY_HERE';
+const PRICE_IDS = {
+  pro: 'price_YOUR_PRO_MONTHLY_PRICE_ID',
+  pro_annual: 'price_YOUR_PRO_ANNUAL_PRICE_ID',
+  agency: 'price_YOUR_AGENCY_PRICE_ID'
+};
+
+let stripe, cardElement;
+let currentPlan = 'pro';
+let currentPrice = 19;
+
+// Initialize Stripe
+function initStripe() {
+  if (STRIPE_PK === 'pk_test_YOUR_PUBLISHABLE_KEY_HERE') {
+    // Demo mode - no real Stripe key
+    document.getElementById('card-element').innerHTML = 
+      '<div style="font-size:13px;color:var(--ink-4);padding:4px 0">Card input ready — add your Stripe key to activate</div>';
+    return;
+  }
+  stripe = Stripe(STRIPE_PK);
+  const elements = stripe.elements({
+    fonts: [{ cssSrc: 'https://fonts.googleapis.com/css2?family=DM+Sans&display=swap' }]
+  });
+  cardElement = elements.create('card', {
+    style: {
+      base: { fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: '#0f0e0c', '::placeholder': { color: '#b8b4aa' } },
+      invalid: { color: '#dc2626' }
+    }
+  });
+  cardElement.mount('#card-element');
+  cardElement.on('change', e => {
+    const wrap = document.getElementById('cardWrap');
+    wrap.classList.toggle('focused', e.elementType === 'card');
+    document.getElementById('card-errors').textContent = e.error ? e.error.message : '';
+  });
+  cardElement.on('focus', () => document.getElementById('cardWrap').classList.add('focused'));
+  cardElement.on('blur', () => document.getElementById('cardWrap').classList.remove('focused'));
+}
+
+function selectPlan(plan, price, cycle, btn) {
+  document.querySelectorAll('.plan-toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPlan = plan;
+  currentPrice = price;
+  document.getElementById('priceDisplay').textContent = price;
+  document.getElementById('cycleDisplay').textContent = cycle === 'annual' ? 'per month, billed annually ($' + (price*12) + '/year)' : 'per month, billed monthly';
+  document.getElementById('submitText').textContent = `Start Pro — $${price}/mo`;
+}
+
+function switchAuth(mode) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('nameField').style.display = mode === 'new' ? 'flex' : 'none';
+  const btn = document.getElementById('submitText');
+  btn.textContent = mode === 'new' ? `Start Pro — $${currentPrice}/mo` : 'Sign in & continue';
+}
+
+async function handleSubmit() {
+  const btn = document.getElementById('submitBtn');
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errorMsg = document.getElementById('errorMsg');
+
+  errorMsg.style.display = 'none';
+
+  if (!email || !password) {
+    errorMsg.textContent = 'Please fill in your email and password.';
+    errorMsg.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Processing...';
+
+  if (STRIPE_PK === 'pk_test_YOUR_PUBLISHABLE_KEY_HERE') {
+    // Demo mode
+    setTimeout(() => {
+      document.getElementById('formContent').style.display = 'none';
+      document.getElementById('successState').style.display = 'block';
+    }, 2000);
+    return;
+  }
+
+  try {
+    // Step 1: Create payment method
+    const { paymentMethod, error } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        email: email,
+        name: document.getElementById('fullName')?.value || ''
+      }
+    });
+
+    if (error) throw new Error(error.message);
+
+    // Step 2: Send to your backend to create subscription
+    // You need to deploy this endpoint — see the launch guide
+    const response = await fetch('/api/create-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        paymentMethodId: paymentMethod.id,
+        priceId: PRICE_IDS[currentPlan]
+      })
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Subscription failed');
+
+    // Handle 3D Secure if needed
+    if (result.requiresAction) {
+      const { error: confirmError } = await stripe.confirmCardPayment(result.clientSecret);
+      if (confirmError) throw new Error(confirmError.message);
+    }
+
+    // Success
+    document.getElementById('formContent').style.display = 'none';
+    document.getElementById('successState').style.display = 'block';
+
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+    btn.disabled = false;
+    btn.innerHTML = `<span id="submitText">Start Pro — $${currentPrice}/mo</span>`;
+  }
+}
+
+// Read plan from URL
+const urlPlan = new URLSearchParams(window.location.search).get('plan');
+if (urlPlan === 'agency') {
+  document.querySelectorAll('.plan-toggle-btn').forEach(b => b.style.display = 'none');
+  selectPlan('agency', 49, 'monthly', document.createElement('button'));
+  document.querySelector('.plan-toggle').innerHTML = '<div style="font-size:13px;color:var(--ink-3)">Agency Plan selected</div>';
+}
+
+initStripe();
+</script>
+</body>
+</html>
